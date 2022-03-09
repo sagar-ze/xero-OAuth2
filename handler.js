@@ -6,26 +6,6 @@ const { XeroClient, Invoice, Phone } = require("xero-node");
 
 const session = require("express-session");
 
-const client_id = "31CCE778ABBE4780B6025158F350CC51";
-const client_secret = "u4Qz4_0XEDaR5oRRIWOtgOLE533YSsKjqVnFSMOB7z7GN7X3";
-const redirectUrl = ["http://localhost:3000/callback"];
-const scopes =
-  "openid profile email";
-
-const xero = new XeroClient({
-  clientId: client_id,
-  clientSecret: client_secret,
-  redirectUris: [redirectUrl],
-  scopes: scopes.split(" "),
-});
-// console.log(xero);
-
-if (!client_id || !client_secret || !redirectUrl) {
-  throw Error(
-    "Environment Variables not all set - please check your .env file in the project root or create one!"
-  );
-}
-
 const app = express();
 
 app.use(express.static(__dirname + "/build"));
@@ -59,45 +39,63 @@ const encodeBody = (params) => {
   return formBody.join("&");
 };
 
-app.get("/", (req, res) => {
-  // request(
-  //   {
-  //     method: "POST",
-  //     uri: "https://identity.xero.com/connect/token",
-  //     headers: {
-  //       authorization:
-  //         "Basic " +
-  //         Buffer.from(client_id + ":" + client_secret).toString("base64"),
-  //       "Content-Type": "application/x-www-form-urlencoded",
-  //     },
-  //     body: encodeBody({ grant_type: "client_credentials", scopes }),
-  //   },
-  //   (error, response, body) => {
-  //     if (error) {
-  //       console.log(error.body);
-  //     } else {
-  //       if (
-  //         response.statusCode &&
-  //         response.statusCode >= 200 &&
-  //         response.statusCode <= 299
-  //       ) {
-  //         console.log({ response: response, body: body });
-  //         // resolve({ response: response, body: body });
-  //       } else {
-  //         console.log(body);
-  //         // console.log("response", response);
-  //         // reject({ response: response, body: body });
-  //       }
-  //     }
-  //   }
-  // );
-  res.send(`<a href='/connect'>Connect to Xero</a>`);
-});
+// app.get("/", (req, res) => {
+// request(
+//   {
+//     method: "POST",
+//     uri: "https://identity.xero.com/connect/token",
+//     headers: {
+//       authorization:
+//         "Basic " +
+//         Buffer.from(client_id + ":" + client_secret).toString("base64"),
+//       "Content-Type": "application/x-www-form-urlencoded",
+//     },
+//     body: encodeBody({ grant_type: "client_credentials", scopes }),
+//   },
+//   (error, response, body) => {
+//     if (error) {
+//       console.log(error.body);
+//     } else {
+//       if (
+//         response.statusCode &&
+//         response.statusCode >= 200 &&
+//         response.statusCode <= 299
+//       ) {
+//         console.log({ response: response, body: body });
+//         // resolve({ response: response, body: body });
+//       } else {
+//         console.log(body);
+//         // console.log("response", response);
+//         // reject({ response: response, body: body });
+//       }
+//     }
+//   }
+// );
+//   res.send(`<a href='/connect'>Connect to Xero</a>`);
+// });
 
-app.get("/connect", async (req, res) => {
+const getXeroConfig = (client_id, client_secret) => {
+  const redirectUrl = ["http://localhost:8080"];
+  const scopes =
+    "openid profile email accounting.settings accounting.reports.read accounting.journals.read accounting.contacts accounting.attachments accounting.transactions offline_access";
+
+  return new XeroClient({
+    clientId: client_id,
+    clientSecret: client_secret,
+    redirectUris: [redirectUrl],
+    scopes: scopes.split(" "),
+  });
+};
+
+app.get("/api", async (req, res) => {
   try {
+    console.log("req.query", req.query);
+    const { client_id, client_secret } = req.query;
+    const xero = getXeroConfig(client_id, client_secret);
+    
     const consentUrl = await xero.buildConsentUrl();
-    res.redirect(consentUrl);
+    console.log(consentUrl);
+    res.send(consentUrl);
   } catch (err) {
     res.send("Sorry, something went wrong");
   }
@@ -106,8 +104,11 @@ app.get("/connect", async (req, res) => {
 app.get("/callback", async (req, res) => {
   try {
     const tokenSet = await xero.apiCallback(req.url);
-    await xero.updateTenants();
-
+    console.log("token set", tokenSet);
+    // cd;
+    // await xero.updateTenants();
+    res.send(tokenSet);
+    return;
     const decodedIdToken = jwtDecode(tokenSet.id_token);
     const decodedAccessToken = jwtDecode(tokenSet.access_token);
 
@@ -120,10 +121,10 @@ app.get("/callback", async (req, res) => {
 
     // const authData = authenticationData(req, res);
     // console.log(xero.tenants[0]);
-    const res = await xero.accountingApi.getContacts(xero.tenants[0].tenantId);
-    console.log("res", res.body);
-    // res.redirect("/organisation");
+    // const res = await xero.accountingApi.getContacts(xero.tenants[0].tenantId);
+    // console.log("res", res.body);
   } catch (err) {
+    console.log(err, "error");
     res.send("Sorry, something went wrong");
   }
 });
@@ -210,5 +211,7 @@ app.get("/contact", async (req, res) => {
     res.json(err);
   }
 });
+const port = 3000;
+app.listen(port, () => console.log(`Example app listening on port ${port}!`));
 
-module.exports.handler = serverless(app);
+module.export = app;
