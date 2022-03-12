@@ -6,12 +6,10 @@
     "dev": "nodemon handler.js"
   },
   "dependencies": {
-    "axios": "^0.26.0",
+    "axios": "^0.26.1",
+    "cors": "^2.8.5",
     "express": "^4.17.1",
-    "express-session": "^1.17.2",
-    "jwt-decode": "^3.1.2",
     "nodemon": "^2.0.15",
-    "request": "^2.88.2",
     "serverless-http": "^2.7.0",
     "xero-node": "^4.19.0"
   },
