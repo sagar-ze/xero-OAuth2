@@ -7,6 +7,7 @@ const { XeroClient } = require("xero-node");
 const app = express();
 
 app.use(cors());
+app.use(express.json());
 
 const redirectUrl = process.env.redirectUrl;
 const clientId = process.env.clientId;
@@ -19,6 +20,7 @@ const xero = new XeroClient({
   clientSecret,
   redirectUris: [redirectUrl.split(",")].flat(),
   scopes: scopes.split(" "),
+  httpTimeout: 10000,
 });
 
 app.get("/api/auth", async (req, res) => {
@@ -34,9 +36,12 @@ app.get("/api/token", async (req, res) => {
   try {
     let url = req.url.split("/api/token");
     url = "/" + url[1];
+    console.log(url);
     const tokenSet = await xero.apiCallback(url);
+    console.log(tokenSet);
     res.send(tokenSet);
   } catch (err) {
+    console.log("error", err);
     res.send(null);
   }
 });
@@ -60,7 +65,7 @@ app.get("/api/refresh-token", async (req, res) => {
   }
 });
 
-app.get("/api/contacts", async (req, res) => {
+app.get("/api/contacts-accounts", async (req, res) => {
   try {
     const access_token = req.headers.authorization.split("Bearer ")[1];
     const tenants = await axios.get("https://api.xero.com/connections", {
@@ -71,48 +76,94 @@ app.get("/api/contacts", async (req, res) => {
     if (!tenants.data) return res.send("No tenants available");
     const tenant = tenants.data[0].tenantId;
 
-    const contacts = await axios.get(
-      "https://api.xero.com/api.xro/2.0/Contacts",
-      {
-        headers: {
-          Authorization: `Bearer ${access_token}`,
-          "Xero-Tenant-Id": tenant,
-        },
-      }
-    );
-    res.status(200).send(contacts.data.Contacts);
+    const headers = {
+      headers: {
+        Authorization: `Bearer ${access_token}`,
+        "Xero-Tenant-Id": tenant,
+      },
+    };
+    const [contacts, accounts] = await Promise.all([
+      axios.get("https://api.xero.com/api.xro/2.0/Contacts", headers),
+      axios.get("https://api.xero.com/api.xro/2.0/Accounts", headers),
+    ]);
+
+    res.status(200).send({
+      contacts: contacts.data.Contacts,
+      accounts: accounts.data.Accounts,
+    });
   } catch (ex) {
-    console.log("Something went wrong", ex);
-    res.send(null);
+    // console.log("Something went wrong", ex.response.data);
+    res.status(401).send(ex.response.data);
   }
 });
 
-app.get("/api/accounts", async (req, res) => {
+app.post("/api/invoices", async (req, res) => {
+  console.log("I 'm server");
+  //
   try {
     const access_token = req.headers.authorization.split("Bearer ")[1];
+    console.log("access_token");
     const tenants = await axios.get("https://api.xero.com/connections", {
       headers: {
         Authorization: `Bearer ${access_token}`,
       },
     });
+
     if (!tenants.data) return res.send("No tenants available");
     const tenant = tenants.data[0].tenantId;
 
-    const accounts = await axios.get(
-      "https://api.xero.com/api.xro/2.0/Accounts",
+    const headers = {
+      headers: {
+        Authorization: `Bearer ${access_token}`,
+        "Xero-Tenant-Id": tenant,
+      },
+    };
+    // var idlist = req.body.list    console.log("req.body", req.body);
+;
+    var unitprice = req.body.unitprice;
+    var description = req.body.description;
+    var to = req.body.to;
+    var qty = req.body.qty;
+    var crtdt = req.body.crtdt;
+    var duedt = req.body.duedt;
+    var account = req.body.account;
+
+    // for (var i in idlist) {
+    //   idlist[i] = _.objID(idlist[i]);
+    // }
+    var itms = [
       {
-        headers: {
-          Authorization: `Bearer ${access_token}`,
-          "Xero-Tenant-Id": tenant,
+        Description: description,
+        Quantity: qty,
+        UnitAmount: unitprice,
+        AccountCode: account,
+      },
+    ];
+    var inv = {
+      Invoices: [
+        {
+          Type: "ACCREC",
+          Contact: { Name: to },
+          Date: crtdt,
+          DueDate: duedt,
+          LineAmountTypes: "Exclusive",
+          LineItems: itms,
         },
-      }
+      ],
+    };
+
+    const invoices = await axios.post(
+      "https://api.xero.com/api.xro/2.0/Invoices",
+      inv,
+      headers
     );
-    res.status(200).send(accounts.data.Accounts);
+
+    res.status(200).send(invoices.data);
   } catch (ex) {
-    console.log("Something went wrong on accounts", ex);
-    res.send(null);
+    res.status(401).send(ex.response.data);
   }
 });
+
 // const port = 3000;
 // app.listen(port, () => console.log(`Example app listening on port ${port}!`));
 
