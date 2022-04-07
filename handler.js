@@ -36,9 +36,7 @@ app.get("/api/token", async (req, res) => {
   try {
     let url = req.url.split("/api/token");
     url = "/" + url[1];
-    console.log(url);
     const tokenSet = await xero.apiCallback(url);
-    console.log(tokenSet);
     res.send(tokenSet);
   } catch (err) {
     console.log("error", err);
@@ -48,16 +46,16 @@ app.get("/api/token", async (req, res) => {
 
 app.get("/api/refresh-token", async (req, res) => {
   try {
-    console.log(req.headers);
+    console.log("get token initiated");
     const refresh_token = req.headers.refresh_token;
-
+    console.log("refresh otkn", refresh_token, clientId, clientSecret);
     const newXeroClient = new XeroClient();
+
     const newTokenSet = await newXeroClient.refreshWithRefreshToken(
       clientId,
       clientSecret,
       refresh_token
     );
-    console.log(newTokenSet);
     res.send(newTokenSet);
   } catch (err) {
     console.log("Failure getting refresh token", err);
@@ -83,8 +81,14 @@ app.get("/api/contacts-accounts", async (req, res) => {
       },
     };
     const [contacts, accounts] = await Promise.all([
-      axios.get("https://api.xero.com/api.xro/2.0/Contacts", headers),
-      axios.get("https://api.xero.com/api.xro/2.0/Accounts", headers),
+      axios.get(
+        "https://api.xero.com/api.xro/2.0/Contacts?where=IsCustomer%3Dtrue&order=Name%20ASC",
+        headers
+      ),
+      axios.get(
+        "https://api.xero.com/api.xro/2.0/Accounts?order=Name%20ASC",
+        headersI
+      ),
     ]);
 
     res.status(200).send({
@@ -92,17 +96,14 @@ app.get("/api/contacts-accounts", async (req, res) => {
       accounts: accounts.data.Accounts,
     });
   } catch (ex) {
-    // console.log("Something went wrong", ex.response.data);
     res.status(401).send(ex.response.data);
   }
 });
 
 app.post("/api/invoices", async (req, res) => {
-  console.log("I 'm server");
   //
   try {
     const access_token = req.headers.authorization.split("Bearer ")[1];
-    console.log("access_token");
     const tenants = await axios.get("https://api.xero.com/connections", {
       headers: {
         Authorization: `Bearer ${access_token}`,
@@ -118,8 +119,6 @@ app.post("/api/invoices", async (req, res) => {
         "Xero-Tenant-Id": tenant,
       },
     };
-    // var idlist = req.body.list    console.log("req.body", req.body);
-;
     var unitprice = req.body.unitprice;
     var description = req.body.description;
     var to = req.body.to;
@@ -128,9 +127,6 @@ app.post("/api/invoices", async (req, res) => {
     var duedt = req.body.duedt;
     var account = req.body.account;
 
-    // for (var i in idlist) {
-    //   idlist[i] = _.objID(idlist[i]);
-    // }
     var itms = [
       {
         Description: description,
