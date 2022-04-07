@@ -87,12 +87,12 @@ app.get("/api/contacts-accounts", async (req, res) => {
       ),
       axios.get(
         "https://api.xero.com/api.xro/2.0/Accounts?order=Name%20ASC",
-        headersI
+        headers
       ),
     ]);
 
     res.status(200).send({
-      contacts: contacts.data.Contacts,
+      contacts: contacts?.data?.Contacts,
       accounts: accounts.data.Accounts,
     });
   } catch (ex) {
